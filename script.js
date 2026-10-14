@@ -267,7 +267,7 @@ cocofoliaJsonInput.addEventListener("change", async () => {
 
 function stripTrailingSlash(text) {
   // 読み込み時のみ、発言末尾の / を削除。途中のURL・コマンド等は維持。
-  return text.replace(/\/+\s*$/, "").trimEnd();
+  return String(text ?? "").replace(/\/+\s*(?=(?:[」』”"]\s*)?$)/g, "").trimEnd();
 }
 
 function parseCocofoliaJson(json) {
@@ -1765,7 +1765,7 @@ body.dark-mode .out-narration.dice-failure, body.dark-mode .out-kp.dice-failure 
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ふきだしノート ログ</title>
+<title>loglier ログ</title>
 <style>
 :root {
   --bg-color: #ffffff;
@@ -2087,6 +2087,7 @@ function buildStateObject() {
     editorTabLayout,
     messageColorMode,
     appearanceColors,
+    appearanceDefaultsVersion: 14,
     initialSkillRulesText,
     showPcSpeech,
     showPlSpeech,
@@ -2101,7 +2102,7 @@ const projectFileInput = document.getElementById("projectFileInput");
 document.getElementById("exportProjectBtn").addEventListener("click", () => {
   if (!allEntries.length) { alert("先にログを読み込んでください。"); return; }
   const project = { format: PROJECT_FORMAT, version: PROJECT_VERSION, exportedAt: new Date().toISOString(), state: buildStateObject() };
-  downloadFile(new Blob([JSON.stringify(project, null, 2)], { type: "application/json;charset=utf-8" }), "fukidashi-note-project.json");
+  downloadFile(new Blob([JSON.stringify(project, null, 2)], { type: "application/json;charset=utf-8" }), "loglier-project.json");
 });
 
 document.getElementById("importProjectBtn").addEventListener("click", () => projectFileInput.click());
@@ -2134,16 +2135,25 @@ function isValidProjectState(state) {
 }
 
 function restoreEditorState(saved) {
-  allEntries = saved.entries;
+  // 古い保存済みログにも、文末スラッシュの取り除きを適用する。
+  allEntries = saved.entries.map(entry => ({...entry, text:stripTrailingSlash(entry.text)}));
   allTabs = saved.tabs;
   allCharacters = saved.characters;
   currentMode = saved.currentMode;
   viewpointCharacterId = saved.viewpointCharacterId;
   imageIdCounter = saved.imageIdCounter;
-  messageColorMode = saved.messageColorMode === "name" ? "name" : "black"; // 未設定なら黒を標準とする
+  // v13以前に自動保存された古い設定が、新しい初期値を上書きする問題を修正。
+  // v14からの保存ではユーザー自身の選択を保持する。
+  const previousDefaults = (saved.appearanceDefaultsVersion ?? 0) < 14;
+  messageColorMode = previousDefaults ? "black" : (saved.messageColorMode === "name" ? "name" : "black");
   messageColorSelect.value = messageColorMode;
   document.body.classList.toggle("mode-color-black", messageColorMode === "black");
   appearanceColors = normalizeAppearanceColors(saved.appearanceColors);
+  if (previousDefaults) {
+    // 旧版の保存色を引き継がず、新しい標準の緑を初回のみ反映。
+    appearanceColors.light.pcBubble = null;
+    appearanceColors.dark.pcBubble = null;
+  }
   applyAppearanceColors();
   initialSkillRulesText = typeof saved.initialSkillRulesText === "string" ? saved.initialSkillRulesText : "";
   initialSkillRulesInput.value = initialSkillRulesText;
