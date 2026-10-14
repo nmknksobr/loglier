@@ -437,8 +437,7 @@ function parseLog(htmlText) {
 
   const characters = [];
   charactersMap.forEach((charId, name) => {
-    const firstEntryColor = findFirstColorForSpeaker(doc, name);
-    const hex = rgbToHex(firstEntryColor);
+    const hex = findMainColorForSpeaker(doc, name);
     characters.push({
       id: charId,
       originalName: name,
@@ -456,16 +455,24 @@ function parseLog(htmlText) {
   return { entries, tabs, characters };
 }
 
-function findFirstColorForSpeaker(doc, speakerName) {
-  const paragraphs = doc.querySelectorAll("p");
-  for (const p of paragraphs) {
+// One speaker may change colors between messages. Choose the most frequent
+// valid color rather than the first message (which may be an accidental gray).
+function findMainColorForSpeaker(doc, speakerName) {
+  const counts = new Map();
+  for (const p of doc.querySelectorAll("p")) {
     const spans = p.querySelectorAll("span");
-    if (spans.length < 2) continue;
-    if (spans[1].textContent.trim() === speakerName) {
-      return p.style.color || "#000000";
-    }
+    if (spans.length < 2 || spans[1].textContent.trim() !== speakerName) continue;
+    const raw = p.style.color;
+    if (!raw) continue;
+    const color = rgbToHex(raw).toLowerCase();
+    counts.set(color, (counts.get(color) || 0) + 1);
   }
-  return "#000000";
+  let mainColor = "#000000";
+  let maxCount = 0;
+  for (const [color, count] of counts) {
+    if (count > maxCount) { mainColor = color; maxCount = count; }
+  }
+  return mainColor;
 }
 
 function rgbToHex(color) {
