@@ -1716,19 +1716,17 @@ backToEditBtn.addEventListener("click", () => {
 });
 
 downloadBtn.addEventListener("click", () => {
-  const htmlString = generateExportHtml();
-  const blob = new Blob([htmlString], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "cocofolia-log-edited.html";
-  a.click();
-
-  URL.revokeObjectURL(url);
+  try {
+    const htmlString = generateExportHtml();
+    downloadFile(new Blob([htmlString], { type: "text/html;charset=utf-8" }), "loglier-log-edited.html");
+  } catch (error) {
+    console.error("HTML出力に失敗しました", error);
+    alert("HTMLの出力に失敗しました。編集用JSONにバックアップしてから、エラーを確認してください。\n" + (error?.message || String(error)));
+  }
 });
 
 function generateExportHtml() {
+  const characterById = new Map(allCharacters.map(c => [c.id, c]));
   const visibleEntries = getVisibleEntriesSorted();
 
   const resolvedEntries = visibleEntries.map((entry) => {
@@ -2233,7 +2231,7 @@ function downloadFile(blob, filename) {
   const link = document.createElement("a");
   link.href = url; link.download = filename;
   document.body.appendChild(link); link.click(); link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function saveCurrentStateIfEnabled() {
