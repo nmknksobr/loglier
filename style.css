@@ -1299,4 +1299,17 @@ body.dark-mode .appearance-palette-swatch {
 
 /* v17: 通常モードでは画像があるJSON発言だけ、左側に顔コマを表示 */
 .message-row.has-normal-avatar { position:relative; padding-left:56px; min-height:49px; }
-.message-row .normal-entry-avatar { position:absolute; left:4px; top:6px; width:42px; height:42px; object-fit:cover; border-radius:10px; }
+/* v18: 通常モードの四角い顔コマは発言行の上端に固定する。
+   縦長の立ち絵は画像の上側を起点に切り抜き、本文の長さに影響されない。 */
+.message-row.has-normal-avatar { position:relative; }
+.message-row .normal-entry-avatar {
+  position:absolute;
+  left:4px;
+  top:5px;
+  width:42px;
+  height:42px;
+  display:block;
+  object-fit:cover;
+  object-position:center top;
+  border-radius:10px;
+}
