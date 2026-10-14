@@ -22,8 +22,8 @@ html {
   --bubble-other-border: #e2e4e8;
   --bubble-self-bg: #fff1e0;
   --bubble-self-border: #f0c98a;
-  --pc-bubble-bg: #b7e6f4;
-  --pc-bubble-border: #258cb6;
+  --pc-bubble-bg: #c9eddd;
+  --pc-bubble-border: #79bda3;
   --pl-bubble-bg: color-mix(in srgb,#ffffff 60%, transparent);
   --accent: #c9762f;
   --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
@@ -46,8 +46,8 @@ body.dark-mode {
   --bubble-other-border: #3d3f47;
   --bubble-self-bg: #3d2c1a;
   --bubble-self-border: #6b4a24;
-  --pc-bubble-bg: #29455f;
-  --pc-bubble-border: #6b9aba;
+  --pc-bubble-bg: #235747;
+  --pc-bubble-border: #6ca88c;
   --pl-bubble-bg: #30343d;
   --accent: #e0954f;
   --shadow: 0 1px 3px rgba(0,0,0,0.3);

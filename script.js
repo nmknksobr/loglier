@@ -14,13 +14,13 @@ let imageIdCounter = 0;
 let isConfirmed = false;
 let activeTabId = null;
 let editorTabLayout = "tabs";
-let messageColorMode = "name"; // 画面の初期選択と一致させる
+let messageColorMode = "black"; // 初期値は読みやすい黒（ダーク時は白）
 // 設定値が null の場合は標準のテーマ色をそのまま使用する。
 const newAppearancePalette = () => ({pcBubble:null, plBubble:null, logBackground:null});
 let appearanceColors = {light:newAppearancePalette(), dark:newAppearancePalette()};
 const APPEARANCE_DEFAULTS = {
-  light: {pcBubble:"#b7e6f4", plBubble:"#f9f8f4", logBackground:"#f0ede6"},
-  dark: {pcBubble:"#29455f", plBubble:"#30343d", logBackground:"#171b25"},
+  light: {pcBubble:"#c9eddd", plBubble:"#f9f8f4", logBackground:"#f0ede6"},
+  dark: {pcBubble:"#235747", plBubble:"#30343d", logBackground:"#171b25"},
 };
 function normalizeAppearanceColors(value) {
   const safe = {light:newAppearancePalette(), dark:newAppearancePalette()};
@@ -49,7 +49,7 @@ function applyAppearanceColors() {
 const APPEARANCE_PRESETS = {
   light: {
     pcBubble: [
-      ["標準・水色", "#b7e6f4"], ["ミント", "#c9eddd"], ["桃色", "#ffdce9"], ["薄紫", "#e1d7fa"],
+      ["水色", "#b7e6f4"], ["標準・ミント", "#c9eddd"], ["桃色", "#ffdce9"], ["薄紫", "#e1d7fa"],
       ["クリーム", "#fff1bb"], ["杏色", "#ffe0c7"], ["青灰", "#d6e2f1"], ["グレー", "#e4e7ec"],
     ],
     plBubble: [
@@ -64,7 +64,7 @@ const APPEARANCE_PRESETS = {
   dark: {
     // 彩度を抑えた深い色だけを採用。ライト側のパレットは一切変更しない。
     pcBubble: [
-      ["標準・夜青", "#29455f"], ["深海", "#164f60"], ["深緑", "#235747"], ["藍紫", "#453d68"],
+      ["夜青", "#29455f"], ["深海", "#164f60"], ["標準・深緑", "#235747"], ["藍紫", "#453d68"],
       ["葡萄", "#643d55"], ["琥珀", "#624630"], ["苔色", "#4a5435"], ["鉄色", "#414b56"],
     ],
     plBubble: [
@@ -265,6 +265,11 @@ cocofoliaJsonInput.addEventListener("change", async () => {
   finally { cocofoliaJsonInput.value = ""; }
 });
 
+function stripTrailingSlash(text) {
+  // 読み込み時のみ、発言末尾の / を削除。途中のURL・コマンド等は維持。
+  return text.replace(/\/+\s*$/, "").trimEnd();
+}
+
 function parseCocofoliaJson(json) {
   if (!json || !Array.isArray(json.messages) || !json.images || typeof json.images !== "object" || Array.isArray(json.images))
     throw new Error("ココフォリアのログJSONの形式ではありません（messages / images が必要です）。");
@@ -302,7 +307,7 @@ function parseCocofoliaJson(json) {
       ? {result:rawRoll.result, success:rawRoll.success===true, failure:rawRoll.failure===true,
          critical:rawRoll.critical===true, fumble:rawRoll.fumble===true} : null;
     // 公式JSONではコマンドとダイス結果が別フィールドなので、表示文に結果を結合する。
-    const text = message.text.trim() + (roll ? " " + roll.result.trim() : "");
+    const text = stripTrailingSlash(message.text.trim()) + (roll ? " " + roll.result.trim() : "");
     const order = entries.length;
     entries.push({id:order,order,tabId:tabsMap.get(tabName),characterId:char.id,
       text,originalText:text,nameOverride:null,colorOverride:null,
@@ -366,7 +371,7 @@ function parseLog(htmlText) {
     const rawTag = spans[0].textContent.trim();
     const tabName = rawTag.replace(/^\[|\]$/g, "").trim();
     const speaker = spans[1].textContent.trim();
-    const text = spans[spans.length - 1].textContent.trim();
+    const text = stripTrailingSlash(spans[spans.length - 1].textContent.trim());
 
     if (!tabsMap.has(tabName)) {
       tabsMap.set(tabName, tabIdCounter++);
@@ -1341,9 +1346,11 @@ function renderSerifMessages(container, tabId, sortedEntries = null) {
       if (!parts.length) return;
       const partHtml = parts.map((part, index) => {
         const isPl = part.kind === "pl";
-        const nameHtml = isConfirmed
-          ? `<p class="bubble-name" style="color:${escapeHtml(displayedColor)}">${isPl ? "PL：" : ""}${escapeHtml(displayedName)}</p>`
-          : `<div class="speaker-edit"><span class="pl-prefix">${isPl ? "PL：" : ""}</span><input class="speaker-input bubble-name" data-id="${entry.id}" style="color:${escapeHtml(displayedColor)}" value="${escapeHtml(displayedName)}" aria-label="発言者名"></div>`;
+        const nameHtml = isPl
+          ? `<p class="bubble-name pl-prefix">PL</p>`
+          : isConfirmed
+            ? `<p class="bubble-name" style="color:${escapeHtml(displayedColor)}">${escapeHtml(displayedName)}</p>`
+            : `<div class="speaker-edit"><input class="speaker-input bubble-name" data-id="${entry.id}" style="color:${escapeHtml(displayedColor)}" value="${escapeHtml(displayedName)}" aria-label="発言者名"></div>`;
         const entryColorHtml = isConfirmed || index !== 0 ? "" : `
           <input type="color" class="entry-color-picker" data-id="${entry.id}" value="${escapeHtml(displayedColor)}" title="この発言だけの色">
           ${entry.colorOverride !== null ? `<button class="revert-btn revert-entrycolor-btn" data-id="${entry.id}" title="この発言だけ色を元に戻す">↺</button>` : ""}`;
@@ -1723,7 +1730,7 @@ body.dark-mode .out-narration.dice-failure, body.dark-mode .out-kp.dice-failure 
         return `<div class="out-bubble-row out-speech-${part.kind} ${diceOutcome(e.text)}" data-characterid="${e.characterId}">
           ${avatar}
           <div class="out-bubble-content">
-            <p class="out-name" style="color:${escapeHtml(e.color)}">${part.kind === "pl" ? "PL：" : ""}${escapeHtml(e.name)}</p>
+            <p class="out-name" style="color:${escapeHtml(e.color)}">${part.kind === "pl" ? "PL" : escapeHtml(e.name)}</p>
             <p class="out-bubble-text"${exportTextStyle(e)}>${escapeHtml(part.text)}</p>
           </div>
         </div>`;
@@ -1769,8 +1776,8 @@ body.dark-mode .out-narration.dice-failure, body.dark-mode .out-kp.dice-failure 
   --kp-text: #555555;
   --bubble-other-bg: #eeeeee;
   --bubble-self-bg: #cfe8ff;
-  --pc-bubble-bg: #b7e6f4;
-  --pc-bubble-border: #258cb6;
+  --pc-bubble-bg: #c9eddd;
+  --pc-bubble-border: #79bda3;
   --pl-bubble-bg: color-mix(in srgb,#eeeeee 60%,transparent);
   --message-neutral-color: #111111;
 }
@@ -1783,8 +1790,8 @@ body.dark-mode {
   --kp-text: #cccccc;
   --bubble-other-bg: #333333;
   --bubble-self-bg: #2c5a7a;
-  --pc-bubble-bg: #29455f;
-  --pc-bubble-border: #6b9aba;
+  --pc-bubble-bg: #235747;
+  --pc-bubble-border: #6ca88c;
   --pl-bubble-bg: #30343d;
   --message-neutral-color: #f1f1f1;
 }
@@ -2133,7 +2140,7 @@ function restoreEditorState(saved) {
   currentMode = saved.currentMode;
   viewpointCharacterId = saved.viewpointCharacterId;
   imageIdCounter = saved.imageIdCounter;
-  messageColorMode = saved.messageColorMode === "black" ? "black" : "name"; // 旧JSONの未設定時もデフォルトは名前色
+  messageColorMode = saved.messageColorMode === "name" ? "name" : "black"; // 未設定なら黒を標準とする
   messageColorSelect.value = messageColorMode;
   document.body.classList.toggle("mode-color-black", messageColorMode === "black");
   appearanceColors = normalizeAppearanceColors(saved.appearanceColors);
