@@ -355,6 +355,28 @@ fileInput.addEventListener("change", (event) => {
   reader.readAsText(file, "UTF-8");
 });
 
+// HTMLログの本文から、<br> や段落タグによる改行を復元する。
+// textContent だけでは <br> が改行として取得されないため、本文要素だけを走査する。
+function extractHtmlLogText(element) {
+  const blockTags = new Set(["DIV", "P", "SECTION", "ARTICLE", "LI", "UL", "OL", "BLOCKQUOTE", "PRE"]);
+  let result = "";
+  const addBreak = () => { if (result && !result.endsWith("\n")) result += "\n"; };
+  const walk = (node) => {
+    if (node.nodeType === 3) { result += node.nodeValue || ""; return; }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName;
+    if (tag === "BR") { result += "\n"; return; }
+    if (tag === "SCRIPT" || tag === "STYLE") return;
+    const isBlock = blockTags.has(tag);
+    if (isBlock) addBreak();
+    for (const child of node.childNodes) walk(child);
+    if (isBlock) addBreak();
+  };
+  walk(element);
+  // 本文前後の空白だけ落とし、途中にある空行・改行は維持する。
+  return result.replace(/\r\n?/g, "\n").trim();
+}
+
 function parseLog(htmlText) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlText, "text/html");
@@ -374,7 +396,7 @@ function parseLog(htmlText) {
     const rawTag = spans[0].textContent.trim();
     const tabName = rawTag.replace(/^\[|\]$/g, "").trim();
     const speaker = spans[1].textContent.trim();
-    const text = stripTrailingSlash(spans[spans.length - 1].textContent.trim());
+    const text = stripTrailingSlash(extractHtmlLogText(spans[spans.length - 1]));
 
     if (!tabsMap.has(tabName)) {
       tabsMap.set(tabName, tabIdCounter++);
