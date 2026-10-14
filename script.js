@@ -1203,6 +1203,16 @@ function editableMessageText(entry, className, extraStyle = "") {
   return `<textarea class="text-input ${className}" data-id="${entry.id}" ${extraStyle}>${escapeHtml(entry.text)}</textarea>`;
 }
 
+// アイコンの有無はデータで判定する。HTMLログなど画像がない発言には余白を設けない。
+function normalEntryAvatar(entry, character) {
+  if (!character || !Array.isArray(character.images)) return "";
+  const override = entry.avatarOverrideImageId !== null
+    ? character.images.find(img => img.id === entry.avatarOverrideImageId) : null;
+  const image = override || character.images.find(img => img.id === character.imageId);
+  if (!image || typeof image.data !== "string" || !image.data.startsWith("data:image/")) return "";
+  return `<img class="normal-entry-avatar" src="${escapeHtml(image.data)}" alt="" loading="lazy" decoding="async">`;
+}
+
 function renderNormalMessages(container, tabId, sortedEntries = null) {
   const characterById = new Map(allCharacters.map(c => [c.id, c]));
   const visibleEntries = sortedEntries ?? getVisibleEntriesSorted(tabId);
@@ -1212,6 +1222,8 @@ function renderNormalMessages(container, tabId, sortedEntries = null) {
     const row = document.createElement("div");
     row.className = "message-row message-boundary " + diceOutcome(entry.text);
     row.dataset.id = entry.id;
+    const avatarHtml = normalEntryAvatar(entry, character);
+    if (avatarHtml) row.classList.add("has-normal-avatar");
 
     const displayedName = entry.nameOverride !== null ? entry.nameOverride : character.displayName;
     const displayedColor = entry.colorOverride !== null ? entry.colorOverride : character.color;
@@ -1219,6 +1231,7 @@ function renderNormalMessages(container, tabId, sortedEntries = null) {
     setMessageTextColor(row, displayedColor);
     if (isConfirmed) {
       row.innerHTML = `
+        ${avatarHtml}
         <div class="speaker-label" style="color:${escapeHtml(displayedColor)}">${escapeHtml(displayedName)}</div>
         ${readonlyMessageText(entry, "normal-inline-text")}
       `;
@@ -1231,6 +1244,7 @@ function renderNormalMessages(container, tabId, sortedEntries = null) {
     const speakerColorStyle = entry.isKp ? "" : `style="color: ${displayedColor}"`;
 
     row.innerHTML = `
+    ${avatarHtml}
     <div class="row-top">
       <div class="name-area">
         ${!entry.isKp ? `
@@ -1731,7 +1745,8 @@ function generateExportHtml() {
       }).join("\n");
     }
     return `
-      <div class="out-plain-row ${diceOutcome(e.text)}">
+      <div class="out-plain-row ${diceOutcome(e.text)}${e.imageData ? " has-out-plain-avatar" : ""}">
+        ${e.imageData ? `<img class="out-plain-avatar" src="${escapeHtml(e.imageData)}" alt="" loading="lazy" decoding="async">` : ""}
         <span class="out-plain-name" style="color:${e.color}">${escapeHtml(e.name)}</span>
         <span class="out-plain-text"${exportTextStyle(e)}>${escapeHtml(e.text)}</span>
       </div>
@@ -1875,6 +1890,8 @@ ${outputDiceGlowCss}
   box-shadow:0 1px 4px rgba(25,105,155,.12);
 }
 .out-plain-row { padding: 10px 4px; margin-bottom: 6px; border-bottom: 1px solid var(--kp-border); }
+.out-plain-row.has-out-plain-avatar { position:relative; padding-left:56px; min-height:48px; }
+.out-plain-avatar { position:absolute; width:42px; height:42px; left:4px; top:10px; border-radius:10px; object-fit:cover; }
 .out-plain-text { white-space:pre-wrap; color:var(--message-neutral-color); }
 .out-plain-name { font-weight: bold; display: block; margin-bottom: 4px; }
 .out-tab-toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:12px 0 18px; }

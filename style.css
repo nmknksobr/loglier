@@ -1288,3 +1288,15 @@ body.dark-mode .appearance-palette-swatch {
 /* v12: 行ごとのレイアウト計算の影響範囲を狭める。
    content-visibility は白抜けの恐れがあるため使わず、全発言を描画する。 */
 .editor-message-list > .message-boundary { contain: layout style; }
+
+/* v16: プレビューの吹き出し角に重なる疑似要素（旧しっぽ）を表示しない。
+   発言の背景・枠線・角丸は維持する。 */
+.bubble-left .preview-message-text.bubble-text::before,
+.bubble-right .preview-message-text.bubble-text::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* v17: 通常モードでは画像があるJSON発言だけ、左側に顔コマを表示 */
+.message-row.has-normal-avatar { position:relative; padding-left:56px; min-height:49px; }
+.message-row .normal-entry-avatar { position:absolute; left:4px; top:6px; width:42px; height:42px; object-fit:cover; border-radius:10px; }
