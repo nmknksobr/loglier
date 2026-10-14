@@ -938,15 +938,7 @@ body.dark-mode { --message-neutral-color: #eeeeee; }
 .message-boundary .preview-message-text { color:var(--entry-text-color, var(--message-neutral-color)); }
 
 
-/* v6 ダイス結果は名前色／モノクロ色を維持し、輪郭に淡い光彩を重ねる */
-body.mode-color-black .message-boundary.dice-success .text-input,
-body.mode-color-black .message-boundary.dice-success .preview-message-text {
-  text-shadow: 0 0 1px rgba(20,165,245,.60), 0 0 3px rgba(25,170,250,.42), 0 0 6px rgba(25,170,250,.18);
-}
-body.mode-color-black .message-boundary.dice-failure .text-input,
-body.mode-color-black .message-boundary.dice-failure .preview-message-text {
-  text-shadow: 0 0 1px rgba(239,62,84,.64), 0 0 3px rgba(239,62,84,.44), 0 0 6px rgba(239,62,84,.18);
-}
+/* ダイスロールに固有の文字色やテキストシャドウは適用しない。 */
 .dice-analysis { margin: 16px 0 18px; color:var(--text-color); font-size:.86rem; }
 .dice-analysis > details { border:1px solid var(--card-border); background:var(--card-bg); border-radius:9px; padding:11px; }
 .dice-analysis summary { cursor:pointer; font-weight:700; list-style-position:inside; }
@@ -1017,16 +1009,6 @@ body.mode-color-black .message-boundary.dice-failure .preview-message-text {
 .pane-top-btn { font-size:.72rem; color:var(--text-color); background:var(--card-bg); border:1px solid var(--card-border); padding:6px 9px; border-radius:6px; cursor:pointer; white-space:nowrap; }
 @media(max-width:850px){.dice-summary-tables{grid-template-columns:1fr}.dice-summary-tables section:last-child{grid-column:auto}}
 @media(max-width:550px){.workspace-btn{padding:11px 12px;font-size:.83rem}.dice-workspace .dice-summary-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.dice-filters label{flex-basis:100%}.dice-workspace .dice-summary-list{grid-template-columns:1fr}.back-to-top{right:12px;bottom:12px}}
-
-/* 名前色モードは名前色そのまま。黒文字モードのみダイス結果の文字色と淡い光彩を適用。 */
-body.mode-color-black .message-boundary.dice-success .text-input,
-body.mode-color-black .message-boundary.dice-success .preview-message-text { color:#137eb5; }
-body.mode-color-black .message-boundary.dice-failure .text-input,
-body.mode-color-black .message-boundary.dice-failure .preview-message-text { color:#bd3d4e; }
-body.dark-mode.mode-color-black .message-boundary.dice-success .text-input,
-body.dark-mode.mode-color-black .message-boundary.dice-success .preview-message-text { color:#74d1f8; }
-body.dark-mode.mode-color-black .message-boundary.dice-failure .text-input,
-body.dark-mode.mode-color-black .message-boundary.dice-failure .preview-message-text { color:#ff9297; }
 
 /* v8 - quote-driven PC speech vs PL comments. View toggles do not modify data. */
 .serif-visibility-bar { display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:9px 12px;border:1px solid var(--card-border);border-radius:9px;background:var(--card-bg);color:var(--text-color);font-size:.88rem; }

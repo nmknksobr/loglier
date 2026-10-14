@@ -14,7 +14,8 @@ let imageIdCounter = 0;
 let isConfirmed = false;
 let activeTabId = null;
 let editorTabLayout = "tabs";
-let messageColorMode = "black"; // 初期値は読みやすい黒（ダーク時は白）
+let messageColorMode = "name"; // 通常モードの初期色は名前色
+let modeTextColors = {normal:"name", serif:"black"}; // モードごとに独立して保持
 // 設定値が null の場合は標準のテーマ色をそのまま使用する。
 const newAppearancePalette = () => ({pcBubble:null, plBubble:null, logBackground:null});
 let appearanceColors = {light:newAppearancePalette(), dark:newAppearancePalette()};
@@ -211,6 +212,7 @@ const serifModeBtn = document.getElementById("serifModeBtn");
 
 normalModeBtn.addEventListener("click", () => {
   currentMode = "normal";
+  syncModeTextColor();
   normalModeBtn.classList.add("active");
   serifModeBtn.classList.remove("active");
   viewpointBar.style.display = "none";
@@ -222,6 +224,7 @@ normalModeBtn.addEventListener("click", () => {
 
 serifModeBtn.addEventListener("click", () => {
   currentMode = "serif";
+  syncModeTextColor();
   serifModeBtn.classList.add("active");
   normalModeBtn.classList.remove("active");
   viewpointBar.style.display = "block";
@@ -703,10 +706,15 @@ function bindReorder(button, tabId) {
 document.getElementById("selectAllPanesBtn").addEventListener("click", () => {focusedPaneId=null; renderMessages();});
 
 const messageColorSelect = document.getElementById("messageColorMode");
-messageColorSelect.value = messageColorMode; // 表示と内部状態を常に同期する
-document.body.classList.toggle("mode-color-black", messageColorMode === "black");
+function syncModeTextColor() {
+  messageColorMode = modeTextColors[currentMode];
+  messageColorSelect.value = messageColorMode;
+  document.body.classList.toggle("mode-color-black", messageColorMode === "black");
+}
+syncModeTextColor();
 messageColorSelect.addEventListener("change", () => {
   messageColorMode = messageColorSelect.value;
+  modeTextColors[currentMode] = messageColorMode;
   document.body.classList.toggle("mode-color-black", messageColorMode === "black");
   renderMessages();
   saveCurrentStateIfEnabled();
@@ -1695,21 +1703,7 @@ function generateExportHtml() {
 
   const exportedColorMode = messageColorMode;
   const exportedAppearance = normalizeAppearanceColors(appearanceColors);
-  const outputDiceGlowCss = exportedColorMode === "black" ? `
-.dice-success .out-bubble-text, .dice-success .out-plain-text,
-.out-narration.dice-success, .out-kp.dice-success {
-  text-shadow:0 0 1px rgba(20,165,245,.60),0 0 3px rgba(25,170,250,.42),0 0 6px rgba(25,170,250,.18);
-  color:#137eb5;
-}
-.dice-failure .out-bubble-text, .dice-failure .out-plain-text,
-.out-narration.dice-failure, .out-kp.dice-failure {
-  text-shadow:0 0 1px rgba(239,62,84,.64),0 0 3px rgba(239,62,84,.44),0 0 6px rgba(239,62,84,.18);
-  color:#bd3d4e;
-}
-body.dark-mode .dice-success .out-bubble-text, body.dark-mode .dice-success .out-plain-text,
-body.dark-mode .out-narration.dice-success, body.dark-mode .out-kp.dice-success {color:#74d1f8;}
-body.dark-mode .dice-failure .out-bubble-text, body.dark-mode .dice-failure .out-plain-text,
-body.dark-mode .out-narration.dice-failure, body.dark-mode .out-kp.dice-failure {color:#ff9297;}` : "";
+  const outputDiceGlowCss = ""; // ダイス結果に文字色変更・光彩は適用しない
   const exportTextStyle = (e) => exportedColorMode === "name" ? ` style="color:${escapeHtml(e.color)}"` : "";
   const renderExportEntry = (e) => {
     if (e.type === "narration") {
@@ -2086,8 +2080,9 @@ function buildStateObject() {
     imageIdCounter,
     editorTabLayout,
     messageColorMode,
+    modeTextColors,
     appearanceColors,
-    appearanceDefaultsVersion: 14,
+    appearanceDefaultsVersion: 15,
     initialSkillRulesText,
     showPcSpeech,
     showPlSpeech,
@@ -2145,9 +2140,13 @@ function restoreEditorState(saved) {
   // v13以前に自動保存された古い設定が、新しい初期値を上書きする問題を修正。
   // v14からの保存ではユーザー自身の選択を保持する。
   const previousDefaults = (saved.appearanceDefaultsVersion ?? 0) < 14;
-  messageColorMode = previousDefaults ? "black" : (saved.messageColorMode === "name" ? "name" : "black");
-  messageColorSelect.value = messageColorMode;
-  document.body.classList.toggle("mode-color-black", messageColorMode === "black");
+  // 旧バージョンの単一文字色設定に関係なく、通常＝名前色、会話＝黒を基準にする。
+  // v15以降の各モード個別設定だけを引き継ぐ。
+  modeTextColors = {
+    normal: saved.modeTextColors?.normal === "black" ? "black" : "name",
+    serif: saved.modeTextColors?.serif === "name" ? "name" : "black",
+  };
+  syncModeTextColor();
   appearanceColors = normalizeAppearanceColors(saved.appearanceColors);
   if (previousDefaults) {
     // 旧版の保存色を引き継がず、新しい標準の緑を初回のみ反映。
