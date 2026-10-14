@@ -358,23 +358,29 @@ fileInput.addEventListener("change", (event) => {
 // HTMLログの本文から、<br> や段落タグによる改行を復元する。
 // textContent だけでは <br> が改行として取得されないため、本文要素だけを走査する。
 function extractHtmlLogText(element) {
-  const blockTags = new Set(["DIV", "P", "SECTION", "ARTICLE", "LI", "UL", "OL", "BLOCKQUOTE", "PRE"]);
+  // Cocofolia HTML separates lines with <br>, not with literal newlines.
+  // Ignore indentation that exists only to pretty-print the HTML source.
+  const blocks = new Set(["DIV", "P", "SECTION", "ARTICLE", "LI", "BLOCKQUOTE", "PRE"]);
   let result = "";
-  const addBreak = () => { if (result && !result.endsWith("\n")) result += "\n"; };
+  const addBlockBreak = () => { if (result && !result.endsWith("\n")) result += "\n"; };
   const walk = (node) => {
-    if (node.nodeType === 3) { result += node.nodeValue || ""; return; }
-    if (node.nodeType !== 1) return;
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = (node.nodeValue || "").replace(/\r\n?/g, "\n");
+      // Source indentation immediately following a <br> is formatting, not dialogue.
+      result += result.endsWith("\n") ? text.replace(/^[ \t]+/, "") : text;
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
     const tag = node.tagName;
-    if (tag === "BR") { result += "\n"; return; }
+    if (tag === "BR") { result = result.replace(/[ \t]+$/, "") + "\n"; return; }
     if (tag === "SCRIPT" || tag === "STYLE") return;
-    const isBlock = blockTags.has(tag);
-    if (isBlock) addBreak();
+    if (blocks.has(tag)) addBlockBreak();
     for (const child of node.childNodes) walk(child);
-    if (isBlock) addBreak();
+    if (blocks.has(tag)) addBlockBreak();
   };
   walk(element);
-  // 本文前後の空白だけ落とし、途中にある空行・改行は維持する。
-  return result.replace(/\r\n?/g, "\n").trim();
+  // Do not collapse internal line breaks (including <br><br> blank lines).
+  return result.trim();
 }
 
 function parseLog(htmlText) {

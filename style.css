@@ -1313,3 +1313,6 @@ body.dark-mode .appearance-palette-swatch {
   object-position:center top;
   border-radius:10px;
 }
+
+/* v20 build marker */
+.app-version { font-size: .7rem; font-weight: 500; opacity: .7; vertical-align: middle; }
