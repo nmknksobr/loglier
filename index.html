@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCF ログ編集</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <button id="menuToggleBtn" class="menu-toggle" aria-label="メニュー開閉">☰ メニュー</button>
+
+  <div class="app-layout">
+
+    <aside id="sidebar" class="sidebar">
+      <button id="sidebarCloseBtn" class="sidebar-close-btn" aria-label="メニューを閉じる">✕</button>
+
+      <h1 class="app-title">
+        <span class="app-title-icon">💬</span>
+        <span class="app-title-text">ふきだし<span class="app-title-accent">ノート</span></span>
+      </h1>
+
+      <label class="file-label">ココフォリアHTMLを読み込む</label>
+      <div class="project-controls"><button type="button" id="importCocofoliaJsonBtn">📂 ココフォリアJSONを読み込む（顔コマ対応）</button><input type="file" id="cocofoliaJsonInput" accept=".json,application/json" hidden></div>
+      <input type="file" id="fileInput" accept=".html,.htm,text/html">
+      <div class="project-controls">
+        <button id="importProjectBtn" type="button">📂 編集用JSONを読み込む</button>
+        <input type="file" id="projectFileInput" accept=".json,application/json" hidden>
+        <button id="exportProjectBtn" type="button">⬇ 編集用JSONを書き出す</button>
+      </div>
+
+      <div class="mode-switch">
+        <button id="normalModeBtn" class="mode-btn active">通常モード</button>
+        <button id="serifModeBtn" class="mode-btn">セリフ風モード</button>
+      </div>
+
+      <div id="viewpointBar" style="display:none;">
+        <label>視点:</label>
+        <select id="viewpointSelect"></select>
+      </div>
+
+      <div class="text-color-controls"><label for="messageColorMode">発言本文の文字色</label><select id="messageColorMode"><option value="name" selected>名前と同じ色</option><option value="black">黒（ダーク時は白）</option></select></div>
+      <details class="appearance-settings" id="appearanceSettings" hidden>
+        <summary>🎨 吹き出し・ログ背景の色</summary>
+        <p class="appearance-hint" id="appearanceThemeLabel">ライトモードの色を設定中</p>
+        <p class="appearance-hint">色を選ぶだけで、画面にすぐ反映されます。</p>
+        <div class="appearance-palette-field">
+          <p class="appearance-palette-title" id="pcBubblePaletteLabel">セリフの吹き出し</p>
+          <div id="pcBubblePalette" class="appearance-palette" role="group" aria-labelledby="pcBubblePaletteLabel"></div>
+        </div>
+        <div class="appearance-palette-field">
+          <p class="appearance-palette-title" id="plBubblePaletteLabel">PL発言の吹き出し</p>
+          <div id="plBubblePalette" class="appearance-palette" role="group" aria-labelledby="plBubblePaletteLabel"></div>
+        </div>
+        <div class="appearance-palette-field">
+          <p class="appearance-palette-title" id="logBackgroundPaletteLabel">ログ画面の背景</p>
+          <div id="logBackgroundPalette" class="appearance-palette" role="group" aria-labelledby="logBackgroundPaletteLabel"></div>
+        </div>
+        <button type="button" id="resetAppearanceBtn">このモードの色を標準に戻す</button>
+        <p class="appearance-hint">ライト・ダークそれぞれに設定可能。編集・プレビュー・HTML出力に反映します。</p>
+      </details>
+      <button id="themeToggleBtn">🌙 ダークモード</button>
+      <button id="confirmBtn">確定してプレビュー</button>
+      <button id="backToEditBtn" style="display:none;">← 編集に戻る</button>
+      <button id="downloadBtn" style="display:none;">⬇ HTMLをダウンロード</button>
+
+      <div class="save-controls">
+        <label><input type="checkbox" id="autosaveCheckbox"> この端末に保存する</label>
+
+      </div>
+
+      <div id="tabBar"></div>
+      <div id="characterPanel"></div>
+      <div class="danger-actions"><button id="deleteSavedDataBtn">保存データを削除</button></div>
+    </aside>
+
+    <main class="main-content">
+      <nav class="workspace-switch" aria-label="メイン画面の切り替え">
+        <button id="showLogWorkspaceBtn" class="workspace-btn active" type="button" aria-pressed="true">ログ編集・プレビュー</button>
+        <button id="showDiceWorkspaceBtn" class="workspace-btn" type="button" aria-pressed="false">ダイス集計 <span id="diceTotalBadge" class="dice-total-badge">0件</span></button>
+      </nav>
+      <section id="logWorkspace" aria-label="ログ編集・プレビュー">
+      <div class="editor-tab-toolbar" aria-label="編集・プレビューのタブ表示">
+        <div class="log-tab-side"><span class="toolbar-label">ログタブ（ドラッグで順序変更）</span><div id="editorTabNavigation" class="editor-tab-navigation"></div></div>
+        <div class="layout-controls" aria-label="表示方式"><button id="editorTabsMode" type="button" aria-pressed="true">タブ切り替え</button><button id="editorSplitMode" type="button" aria-pressed="false">横並び表示</button></div>
+      </div>
+      <div id="serifVisibilityBar" class="serif-visibility-bar" hidden aria-label="セリフ風表示の切り替え">
+        <span>会話の表示</span>
+        <label><input type="checkbox" id="showPcSpeech" checked> セリフ（「」内）</label>
+        <label><input type="checkbox" id="showPlSpeech" checked> PL発言（「」外）</label>
+        <small>「」の外は一旦PL扱い（行動描写は別分類しません）。非表示でも原文は残ります。</small>
+        <span id="speechDetectionStatus" class="speech-detection-status" aria-live="polite"></span>
+      </div>
+      <div id="splitSelectionBar" class="split-selection-bar" hidden><span id="splitSelectionStatus">すべての列を表示中</span><button id="selectAllPanesBtn" type="button">全列を編集</button></div>
+      <div id="logPanels" class="log-panels single"></div>
+      </section>
+      <section id="diceWorkspace" class="dice-workspace" aria-label="ダイス集計" hidden>
+        <header class="dice-header"><h2>ダイス集計</h2><button type="button" id="copyDiceSummaryBtn" class="copy-summary-btn">集計結果をコピー</button><p>クリティカル・スペシャル・ファンブルを、ログタブ別・人物ごとにまとめます。発言を選ぶと元のログへ移動します。</p></header>
+        <div class="dice-filters">
+          <label for="diceSummaryScope">ログタブ<select id="diceSummaryScope"><option value="all">すべてのタブ</option></select></label>
+          <label for="diceSpeakerScope">発言者<select id="diceSpeakerScope"><option value="all">すべての発言者</option></select></label>
+          <button id="diceResetFiltersBtn" type="button">絞り込み解除</button>
+        </div>
+        <div id="copyFallback" class="copy-fallback" hidden><p>コピーが自動でできない場合は、下の文字を長押し・選択してコピーしてください。</p><textarea id="copyFallbackText" rows="6" readonly></textarea><button id="closeCopyFallbackBtn" type="button">閉じる</button></div>
+        <div id="diceSummaryMetrics" class="dice-summary-metrics" role="status" aria-live="polite"></div>
+        <p class="dice-analysis-note">割合＝その結果の回数 ÷ 解析できたダイスロールの合計 × 100。「決定的成功／スペシャル」はクリティカルに1件として計上します。通常成功・通常失敗は分母に含めますが、表示やコピーには出しません。</p>
+        <div class="dice-summary-tables">
+          <section><h3>ログタブ別</h3><div id="diceByTab" class="dice-breakdown-cards"></div></section>
+        </div>
+        <details class="initial-values-details">
+          <summary>初期値成功の判定設定（任意）</summary>
+          <label for="initialSkillRules">技能名＝初期値（1行に1つ）</label>
+          <textarea id="initialSkillRules" rows="4" placeholder="例：技能名＝25&#10;別の技能＝10" spellcheck="false"></textarea>
+          <p class="dice-analysis-note">技能の初期値は版やルールに合わせて入力してください。目標値が一致して成功した発言を「初期値成功候補」とします。成長や補正は判別できません。</p>
+          <p id="initialSkillRuleError" class="dice-rule-error" role="status"></p>
+        </details>
+        <h3 class="dice-list-heading">特徴的なダイス結果</h3>
+        <div id="diceSummaryList" class="dice-summary-list"></div>
+      </section>
+      <button id="backToTopBtn" class="back-to-top" type="button" hidden aria-label="先頭に戻る">↑ 先頭へ</button>
+    </main>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
