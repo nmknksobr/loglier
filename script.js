@@ -453,7 +453,10 @@ function renderTabBar() {
   tabBar.innerHTML = "";
   allTabs.forEach((tab) => {
     const chip = document.createElement("button");
-    chip.textContent = tab.visible ? `👁 ${tab.name}` : `🚫 ${tab.name}`;
+    // 絵文字の目はOSごとに見た目が大きく変わるため、シンプルな記号を使用。
+    chip.textContent = tab.visible ? `● ${tab.name}` : `○ ${tab.name}`;
+    chip.setAttribute("aria-label", `${tab.name}：${tab.visible ? "表示中" : "非表示"}。タップで切り替え`);
+    chip.title = tab.visible ? "表示中（タップで非表示）" : "非表示（タップで表示）";
     chip.className = tab.visible ? "tab-chip visible" : "tab-chip hidden";
     chip.addEventListener("click", () => {
       tab.visible = !tab.visible;
@@ -750,6 +753,13 @@ function renderMessages() {
   host.className = "log-panels " + (editorTabLayout === "split" ? "split" : "single");
   host.replaceChildren();
   const selectedTabs = editorTabLayout === "split" ? tabs : tabs.filter(t => t.id === activeTabId);
+  // 各タブで全発言を繰り返し走査する代わりに一度だけ振り分ける。
+  const entriesByTab = new Map(selectedTabs.map(tab => [tab.id, []]));
+  for (const entry of allEntries) {
+    const bucket = entriesByTab.get(entry.tabId);
+    if (bucket) bucket.push(entry);
+  }
+  for (const bucket of entriesByTab.values()) bucket.sort((a,b) => a.order-b.order);
   selectedTabs.forEach(tab => {
     const pane = document.createElement("section");
     pane.className = "editor-log-pane";
@@ -783,8 +793,8 @@ function renderMessages() {
     list.className = "editor-message-list";
     pane.append(heading, list);
     host.appendChild(pane);
-    if (currentMode === "normal") renderNormalMessages(list, tab.id);
-    else renderSerifMessages(list, tab.id);
+    if (currentMode === "normal") renderNormalMessages(list, tab.id, entriesByTab.get(tab.id));
+    else renderSerifMessages(list, tab.id, entriesByTab.get(tab.id));
     if (locked) {
       // スクロールは有効のまま、編集操作だけを無効化する。
       list.querySelectorAll("input, textarea, button, select").forEach(el=>{el.disabled=true;});
@@ -1180,11 +1190,12 @@ function editableMessageText(entry, className, extraStyle = "") {
   return `<textarea class="text-input ${className}" data-id="${entry.id}" ${extraStyle}>${escapeHtml(entry.text)}</textarea>`;
 }
 
-function renderNormalMessages(container, tabId) {
-  const visibleEntries = getVisibleEntriesSorted(tabId);
+function renderNormalMessages(container, tabId, sortedEntries = null) {
+  const characterById = new Map(allCharacters.map(c => [c.id, c]));
+  const visibleEntries = sortedEntries ?? getVisibleEntriesSorted(tabId);
 
   visibleEntries.forEach((entry) => {
-    const character = allCharacters.find((c) => c.id === entry.characterId);
+    const character = characterById.get(entry.characterId);
     const row = document.createElement("div");
     row.className = "message-row message-boundary " + diceOutcome(entry.text);
     row.dataset.id = entry.id;
@@ -1271,11 +1282,12 @@ function segmentedMessageTextarea(entry, part, className, background) {
 function segmentedPreviewText(part, className) {
   return `<div class="preview-message-text ${className}">${escapeHtml(part.text)}</div>`;
 }
-function renderSerifMessages(container, tabId) {
-  const visibleEntries = getVisibleEntriesSorted(tabId);
+function renderSerifMessages(container, tabId, sortedEntries = null) {
+  const characterById = new Map(allCharacters.map(c => [c.id, c]));
+  const visibleEntries = sortedEntries ?? getVisibleEntriesSorted(tabId);
 
   visibleEntries.forEach((entry) => {
-    const character = allCharacters.find((c) => c.id === entry.characterId);
+    const character = characterById.get(entry.characterId);
     const displayedName = entry.nameOverride !== null ? entry.nameOverride : character.displayName;
     const displayedColor = entry.colorOverride !== null ? entry.colorOverride : character.color;
 
@@ -1475,8 +1487,7 @@ function attachCommonListeners() {
     });
   });
 
-  document.querySelectorAll(".text-input").forEach((textarea) => {
-    autoResizeTextarea(textarea);
+  document.querySelectorAll("#logPanels textarea.text-input").forEach((textarea) => {
 
     textarea.addEventListener("input", () => {
       const entry = allEntries.find((e) => e.id === Number(textarea.dataset.id));
@@ -1557,6 +1568,8 @@ function attachCommonListeners() {
       renderMessages();
     });
   });
+  // 高さのリセット・計測・設定をまとめて実施し、Safariでの連続レイアウト計算を抑制。
+  resizeVisibleMessageTextareas();
 }
 
 function reorderByDrag(draggedId, targetId, insertAfter) {
@@ -1655,7 +1668,7 @@ function generateExportHtml() {
   const visibleEntries = getVisibleEntriesSorted();
 
   const resolvedEntries = visibleEntries.map((entry) => {
-    const character = allCharacters.find((c) => c.id === entry.characterId);
+    const character = characterById.get(entry.characterId);
 
     const overrideImage = entry.avatarOverrideImageId !== null
       ? character.images.find((img) => img.id === entry.avatarOverrideImageId)
@@ -2199,6 +2212,18 @@ document.querySelector(".main-content").addEventListener("click", () => {
   }
 });
 
+// 初期描画時は全欄の書き込み→計測→書き込みをまとめる。
+// 発言は全件DOMに残すのでスクロールや編集・並べ替えに件数制限はない。
+function resizeVisibleMessageTextareas() {
+  const areas = [...document.querySelectorAll("#logPanels textarea.text-input")];
+  for (const area of areas) area.style.height = "auto";
+  const heights = areas.map(area => {
+    const minimum = area.classList.contains("kp-text") ? 82 :
+      area.classList.contains("narration-text") ? 66 : 50;
+    return Math.max(minimum, area.scrollHeight);
+  });
+  areas.forEach((area, index) => { area.style.height = heights[index] + "px"; });
+}
 // テキストエリアの高さを、中身に合わせて自動的に広げる
 function autoResizeTextarea(textarea) {
   const isKp = textarea.classList.contains("kp-text");
@@ -2212,5 +2237,5 @@ function autoResizeTextarea(textarea) {
 }
 // 画面幅変更時に折り返し量が変わるため、長いKP・ナレーション欄の高さを再調整する。
 window.addEventListener("resize", () => {
-  document.querySelectorAll("#logPanels textarea.text-input").forEach(autoResizeTextarea);
+  resizeVisibleMessageTextareas();
 });

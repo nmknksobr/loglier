@@ -1302,3 +1302,7 @@ body.dark-mode .appearance-palette-swatch {
   body.serif-mode .kp-row {width:96% !important;}
   body.serif-mode .kp-row .kp-text {padding:11px 12px;}
 }
+
+/* v12: 行ごとのレイアウト計算の影響範囲を狭める。
+   content-visibility は白抜けの恐れがあるため使わず、全発言を描画する。 */
+.editor-message-list > .message-boundary { contain: layout style; }
