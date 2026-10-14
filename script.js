@@ -4,6 +4,7 @@ const characterPanel = document.getElementById("characterPanel");
 const viewpointBar = document.getElementById("viewpointBar");
 const viewpointSelect = document.getElementById("viewpointSelect");
 
+let sourceLogFilename = ""; // 読み込んだ元ログのファイル名（HTML出力用）
 let allEntries = [];
 let allTabs = [];
 let allCharacters = [];
@@ -252,6 +253,7 @@ cocofoliaJsonInput.addEventListener("change", async () => {
     if (!result.entries.length) throw new Error("読み込める発言がありません。");
     if (allEntries.length && !confirm("現在のログをココフォリアJSONで置き換えますか？")) return;
     hasUserLoadedData = true;
+    sourceLogFilename = file.name;
     allEntries = result.entries;
     allTabs = result.tabs;
     allCharacters = result.characters;
@@ -331,6 +333,7 @@ fileInput.addEventListener("change", (event) => {
     const htmlText = e.target.result;
     const result = parseLog(htmlText);
     if (!result.entries.length) { alert("ログの発言を読み取れませんでした。元のログはそのまま残します。"); return; }
+    sourceLogFilename = file.name;
     allEntries = result.entries;
     allTabs = result.tabs;
     // ココフォリアでは最初に other 等の少数ログが並ぶ場合があるため、
@@ -1718,12 +1721,21 @@ backToEditBtn.addEventListener("click", () => {
 downloadBtn.addEventListener("click", () => {
   try {
     const htmlString = generateExportHtml();
-    downloadFile(new Blob([htmlString], { type: "text/html;charset=utf-8" }), "loglier-log-edited.html");
+    downloadFile(new Blob([htmlString], { type: "text/html;charset=utf-8" }), getEditedHtmlFilename());
   } catch (error) {
     console.error("HTML出力に失敗しました", error);
     alert("HTMLの出力に失敗しました。編集用JSONにバックアップしてから、エラーを確認してください。\n" + (error?.message || String(error)));
   }
 });
+
+// 元のファイル名を維持し、拡張子だけ .html に揃えて _edited を付ける。
+function getEditedHtmlFilename() {
+  const fallback = "loglier-log";
+  const original = String(sourceLogFilename || "").split(/[\\/]/).pop() || fallback;
+  const stem = original.replace(/\.[^.]+$/, "") || fallback;
+  const safeStem = stem.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").trim() || fallback;
+  return `${safeStem}_edited.html`;
+}
 
 function generateExportHtml() {
   const characterById = new Map(allCharacters.map(c => [c.id, c]));
@@ -2122,6 +2134,7 @@ deleteSavedDataBtn.addEventListener("click", async () => {
 
 function buildStateObject() {
   return {
+    sourceLogFilename,
     entries: allEntries,
     tabs: allTabs,
     characters: allCharacters,
@@ -2181,6 +2194,7 @@ function isValidProjectState(state) {
 
 function restoreEditorState(saved) {
   // 古い保存済みログにも、文末スラッシュの取り除きを適用する。
+  sourceLogFilename = typeof saved.sourceLogFilename === "string" ? saved.sourceLogFilename : "";
   allEntries = saved.entries.map(entry => ({...entry, text:stripTrailingSlash(entry.text)}));
   allTabs = saved.tabs;
   allCharacters = saved.characters;
