@@ -1316,3 +1316,18 @@ body.dark-mode .appearance-palette-swatch {
 
 /* v20 build marker */
 .app-version { font-size: .7rem; font-weight: 500; opacity: .7; vertical-align: middle; }
+
+/* v25: manual link */
+.manual-link { display:block; padding:10px 12px; margin:8px 0 16px; color:inherit; text-decoration:none; font-weight:700; border:1px solid currentColor; border-radius:9px; text-align:center; }
+.manual-link:hover,.manual-link:focus-visible { text-decoration:underline; }
+
+/* v26: 横長の人物別ダイス一覧表 */
+.dice-table-scroller { max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.dice-comparison-table { width:100%; min-width:950px; border-collapse:collapse; font-size:14px; }
+.dice-comparison-table th,.dice-comparison-table td { border:1px solid var(--border-color, #ccc); padding:10px 12px; white-space:nowrap; text-align:right; }
+.dice-comparison-table th:first-child { text-align:left; position:sticky; left:0; background:var(--bg-color,white); }
+.dice-comparison-table thead th { background:var(--kp-bg,#eee); }
+
+/* 人物ごとの表示切り替え */
+.character-visibility-control { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; font-size:.82em; color:var(--text-color); cursor:pointer; }
+.character-visibility-control input { accent-color: var(--accent-color, #56876c); width:16px; height:16px; }

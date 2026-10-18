@@ -174,6 +174,7 @@ showPlSpeechInput.addEventListener("change", () => {
 });
 const logWorkspace = document.getElementById("logWorkspace");
 const diceWorkspace = document.getElementById("diceWorkspace");
+const diceTableWorkspace = document.getElementById("diceTableWorkspace");
 const mainContent = document.querySelector(".main-content");
 const backToTopBtn = document.getElementById("backToTopBtn");
 
@@ -182,12 +183,14 @@ function setWorkspace(which) {
   document.body.classList.toggle("dice-workspace-active", which === "dice");
   logWorkspace.hidden = which !== "logs";
   diceWorkspace.hidden = which !== "dice";
-  for (const [id, value] of [["showLogWorkspaceBtn", "logs"], ["showDiceWorkspaceBtn", "dice"]]) {
+  diceTableWorkspace.hidden = which !== "table";
+  for (const [id, value] of [["showLogWorkspaceBtn", "logs"], ["showDiceWorkspaceBtn", "dice"], ["showDiceTableBtn", "table"]]) {
     const button = document.getElementById(id);
     button.classList.toggle("active", which === value);
     button.setAttribute("aria-pressed", String(which === value));
   }
   if (which === "dice") renderDiceSummary();
+  if (which === "table") renderDiceTable();
   syncSpeechVisibilityControls();
   mainContent.scrollTo({ top: 0 });
   window.scrollTo({ top: 0 });
@@ -195,6 +198,7 @@ function setWorkspace(which) {
 }
 document.getElementById("showLogWorkspaceBtn").addEventListener("click", () => setWorkspace("logs"));
 document.getElementById("showDiceWorkspaceBtn").addEventListener("click", () => setWorkspace("dice"));
+document.getElementById("showDiceTableBtn").addEventListener("click", () => setWorkspace("table"));
 // 通常モードで始まるため、初期表示でも色設定欄を隠す。
 syncSpeechVisibilityControls();
 
@@ -323,39 +327,57 @@ function parseCocofoliaJson(json) {
   return {entries,tabs:[...tabsMap].map(([name,id])=>({id,name,visible:true})),characters,nextImageId};
 }
 
-fileInput.addEventListener("change", (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  hasUserLoadedData = true;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const htmlText = e.target.result;
-    const result = parseLog(htmlText);
-    if (!result.entries.length) { alert("ログの発言を読み取れませんでした。元のログはそのまま残します。"); return; }
-    sourceLogFilename = file.name;
-    allEntries = result.entries;
-    allTabs = result.tabs;
-    // ココフォリアでは最初に other 等の少数ログが並ぶ場合があるため、
-    // main があればそこから表示する（セリフの抽出結果を見つけやすくする）。
-    const mainTab = allTabs.find(tab => tab.name.trim().toLowerCase() === "main");
-    activeTabId = (mainTab ?? allTabs[0])?.id ?? null;
-    allCharacters = result.characters;
-    // 新しいHTMLを読み込んだ際は、前回の非表示設定を引き継がない。
-    showPcSpeech = true;
-    showPlSpeech = true;
-    syncSpeechVisibilityControls();
-
-    if (allCharacters.length > 0) {
-      viewpointCharacterId = allCharacters[0].id;
+// 複数HTMLは追加読み込み。ファイル間の同名タブは統合せず独立させる。
+fileInput.addEventListener("change", async (event) => {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+  try {
+    const parsed = [];
+    for (const file of files) {
+      const result = parseLog(await file.text());
+      if (!result.entries.length) throw new Error(`${file.name} に読み取れる発言がありません。`);
+      parsed.push({file, result});
     }
-
-    renderTabBar();
-    renderCharacterPanel();
-    renderViewpointSelect();
-    renderMessages();
-  };
-  reader.readAsText(file, "UTF-8");
+    if (!allEntries.length) sourceLogFilename = files.length === 1 ? files[0].name : "combined_logs.html";
+    else if (!sourceLogFilename.startsWith("combined_")) sourceLogFilename = "combined_logs.html";
+    const nextTabId = () => Math.max(-1, ...allTabs.map(t => t.id)) + 1;
+    const nextEntryId = () => Math.max(-1, ...allEntries.map(e => e.id)) + 1;
+    const nextCharId = () => Math.max(-1, ...allCharacters.map(c => c.id)) + 1;
+    for (const {file,result} of parsed) {
+      const tabMap = new Map(), characterMap = new Map();
+      const stem = file.name.replace(/\.[^.]+$/, "");
+      for (const tab of result.tabs) {
+        const id = nextTabId();
+        tabMap.set(tab.id, id);
+        const label = result.tabs.length === 1 ? stem : `${stem} / ${tab.name}`;
+        const used = new Set(allTabs.map(t => t.name));
+        let name = label, n = 2;
+        while (used.has(name)) name = `${label} (${n++})`;
+        allTabs.push({...tab, id, name});
+      }
+      for (const char of result.characters) {
+        const existing = allCharacters.find(c => c.originalName === char.originalName);
+        if (existing) characterMap.set(char.id, existing.id);
+        else { const id = nextCharId(); characterMap.set(char.id, id); allCharacters.push({...char,id}); }
+      }
+      for (const entry of result.entries) {
+        const id = nextEntryId();
+        allEntries.push({...entry,id,order:id,tabId:tabMap.get(entry.tabId),characterId:characterMap.get(entry.characterId)});
+      }
+    }
+    hasUserLoadedData = true;
+    if (activeTabId === null) activeTabId = allTabs[0]?.id ?? null;
+    if (viewpointCharacterId === null) viewpointCharacterId = allCharacters[0]?.id ?? null;
+    isConfirmed = false;
+    normalModeBtn.style.display = "inline-block"; serifModeBtn.style.display = "inline-block";
+    document.getElementById("confirmBtn").style.display = "inline-block";
+    document.getElementById("backToEditBtn").style.display = "none";
+    document.getElementById("downloadBtn").style.display = "none";
+    tabBar.style.display = "block"; characterPanel.style.display = "block";
+    renderTabBar(); renderCharacterPanel(); renderViewpointSelect(); renderMessages();
+    saveCurrentStateIfEnabled();
+  } catch (error) { console.error(error); alert("HTMLを読み込めませんでした: " + error.message); }
+  finally { fileInput.value = ""; }
 });
 
 // HTMLログの本文から、<br> や段落タグによる改行を復元する。
@@ -562,6 +584,9 @@ function renderCharacterPanel() {
       <input type="color" class="color-picker" data-id="${char.id}" value="${char.color}">
       <input type="text" class="color-hex" data-id="${char.id}" value="${char.color}" maxlength="7">
       ${colorChanged ? `<button class="revert-btn revert-color-btn" data-id="${char.id}" title="色を元に戻す">↺</button>` : ""}
+      <label class="character-visibility-control" title="この人物の発言をログ・出力・集計から非表示にする">
+        <input type="checkbox" class="character-visible-input" data-id="${char.id}" ${char.visible === false ? "" : "checked"}> 表示
+      </label>
       ${currentMode === "serif" ? `
         <select class="type-select" data-id="${char.id}">
           <option value="narration" ${char.type === "narration" ? "selected" : ""}>ナレーション</option>
@@ -571,6 +596,17 @@ function renderCharacterPanel() {
       ` : ""}
     `;
     characterPanel.appendChild(card);
+  });
+
+  characterPanel.querySelectorAll(".character-visible-input").forEach(input => {
+    input.addEventListener("change", () => {
+      const character = allCharacters.find(char => char.id === Number(input.dataset.id));
+      if (!character) return;
+      character.visible = input.checked;
+      renderMessages();
+      refreshDiceFilterOptions();
+      saveCurrentStateIfEnabled();
+    });
   });
 
   document.querySelectorAll(".avatar-upload-label").forEach((label) => {
@@ -671,10 +707,14 @@ function renderCharacterPanel() {
   });
 }
 
+function isCharacterVisible(characterId) {
+  return allCharacters.find(char => char.id === characterId)?.visible !== false;
+}
+
 function getVisibleEntriesSorted(tabId = null) {
   const visibleTabIds = tabId !== null ? [tabId] : allTabs.filter((t) => t.visible).map((t) => t.id);
   return allEntries
-    .filter((entry) => visibleTabIds.includes(entry.tabId))
+    .filter((entry) => visibleTabIds.includes(entry.tabId) && isCharacterVisible(entry.characterId))
     .sort((a, b) => a.order - b.order);
 }
 
@@ -807,6 +847,7 @@ function renderMessages() {
   // 各タブで全発言を繰り返し走査する代わりに一度だけ振り分ける。
   const entriesByTab = new Map(selectedTabs.map(tab => [tab.id, []]));
   for (const entry of allEntries) {
+    if (!isCharacterVisible(entry.characterId)) continue;
     const bucket = entriesByTab.get(entry.tabId);
     if (bucket) bucket.push(entry);
   }
@@ -864,6 +905,7 @@ function renderMessages() {
   if (!isConfirmed) attachCommonListeners();
   updateSpeechDetectionStatus();
   if (activeWorkspace === "dice") renderDiceSummary();
+  else if (activeWorkspace === "table") renderDiceTable();
   else document.getElementById("diceTotalBadge").textContent = `${getDiceRollTotal()}件`;
 }
 
@@ -945,6 +987,7 @@ function getDiceAnalysis(tabScope = "all", speakerScope = "all") {
   const { rules, errors } = parseInitialSkillRules(initialSkillRulesText);
   const speakers = new Map(allCharacters.map(char => [char.id, char.displayName]));
   const records = allEntries.flatMap(entry => {
+    if (!isCharacterVisible(entry.characterId)) return [];
     const speakerName = String(entry.nameOverride ?? speakers.get(entry.characterId) ?? "不明");
     if (tabScope !== "all" && String(entry.tabId) !== tabScope) return [];
     if (speakerScope !== "all" && speakerName !== speakerScope) return [];
@@ -958,6 +1001,27 @@ function getDiceAnalysis(tabScope = "all", speakerScope = "all") {
   });
   return { records, counts: countDiceRecords(records), errors };
 }
+// 通常成功・スペシャル・クリティカルを成功、通常失敗・ファンブルを失敗に含める。
+function getDicePersonRows() {
+  const {records} = getDiceAnalysis();
+  const people = new Map();
+  for (const rec of records) {
+    if (!people.has(rec.speakerName)) people.set(rec.speakerName, []);
+    people.get(rec.speakerName).push(rec);
+  }
+  return [...people.entries()].map(([name, items]) => {
+    const c = countDiceRecords(items);
+    return {name,...c, successes:c.success+c.special+c.critical, failures:c.failure+c.fumble};
+  }).sort((a,b) => b.total-a.total || a.name.localeCompare(b.name,"ja"));
+}
+function diceRate(n,total) { return total ? (n * 100 / total).toFixed(1) + "%" : "0.0%"; }
+function makeDiceTableHtml(rows) {
+  const cols = ["人物名","ダイス総数","成功","失敗","スペシャル","クリティカル","ファンブル","スペ率","クリ率","ファン率","成功率"];
+  const cells = rows.map(r => `<tr><th scope="row">${escapeHtml(r.name)}</th><td>${r.total}</td><td>${r.successes}</td><td>${r.failures}</td><td>${r.special}</td><td>${r.critical}</td><td>${r.fumble}</td><td>${diceRate(r.special,r.total)}</td><td>${diceRate(r.critical,r.total)}</td><td>${diceRate(r.fumble,r.total)}</td><td>${diceRate(r.successes,r.total)}</td></tr>`).join("");
+  return `<table class="dice-comparison-table"><thead><tr>${cols.map(c=>`<th scope="col">${c}</th>`).join("")}</tr></thead><tbody>${cells || '<tr><td colspan="11">集計できるダイスロールがありません。</td></tr>'}</tbody></table>`;
+}
+function renderDiceTable() { document.getElementById("diceTableHost").innerHTML = makeDiceTableHtml(getDicePersonRows()); }
+
 function countDiceRecords(records) {
   const counts = { total: records.length, critical: 0, special: 0, fumble: 0, success: 0, failure: 0, other: 0, initial: 0 };
   records.forEach(record => {
@@ -1018,7 +1082,7 @@ function refreshDiceFilterOptions() {
   scope.replaceChildren(new Option("すべてのタブ", "all"));
   allTabs.forEach(tab => scope.add(new Option(tab.name, String(tab.id))));
   scope.value = [...scope.options].some(opt => opt.value === currentTab) ? currentTab : "all";
-  const names = new Set(allEntries.map(entry => String(entry.nameOverride ?? allCharacters.find(c => c.id === entry.characterId)?.displayName ?? "不明")));
+  const names = new Set(allEntries.filter(entry => isCharacterVisible(entry.characterId)).map(entry => String(entry.nameOverride ?? allCharacters.find(c => c.id === entry.characterId)?.displayName ?? "不明")));
   speaker.replaceChildren(new Option("すべての発言者", "all"));
   [...names].sort((a,b)=>a.localeCompare(b,"ja")).forEach(name => speaker.add(new Option(name, name)));
   speaker.value = [...speaker.options].some(opt=>opt.value === currentSpeaker) ? currentSpeaker : "all";
@@ -1142,7 +1206,7 @@ function renderDiceSummary() {
   }
 }
 function getDiceRollTotal() {
-  return allEntries.reduce((sum, entry) => sum + parseEntryDiceRecords(entry).filter(record => ["critical", "special", "fumble"].includes(record.category)).length, 0);
+  return allEntries.filter(entry => isCharacterVisible(entry.characterId)).reduce((sum, entry) => sum + parseEntryDiceRecords(entry).filter(record => ["critical", "special", "fumble"].includes(record.category)).length, 0);
 }
 function jumpToDiceEntry(entryId, tabId) {
   const tab = allTabs.find(t => t.id === tabId);
@@ -1406,11 +1470,9 @@ function renderSerifMessages(container, tabId, sortedEntries = null) {
       if (!parts.length) return;
       const partHtml = parts.map((part, index) => {
         const isPl = part.kind === "pl";
-        const nameHtml = isPl
-          ? `<p class="bubble-name pl-prefix">PL</p>`
-          : isConfirmed
-            ? `<p class="bubble-name" style="color:${escapeHtml(displayedColor)}">${escapeHtml(displayedName)}</p>`
-            : `<div class="speaker-edit"><input class="speaker-input bubble-name" data-id="${entry.id}" style="color:${escapeHtml(displayedColor)}" value="${escapeHtml(displayedName)}" aria-label="発言者名"></div>`;
+        const nameHtml = isConfirmed
+          ? `<p class="bubble-name" style="color:${escapeHtml(displayedColor)}">${escapeHtml(displayedName)}</p>`
+          : `<div class="speaker-edit"><input class="speaker-input bubble-name" data-id="${entry.id}" style="color:${escapeHtml(displayedColor)}" value="${escapeHtml(displayedName)}" aria-label="発言者名"></div>`;
         const entryColorHtml = isConfirmed || index !== 0 ? "" : `
           <input type="color" class="entry-color-picker" data-id="${entry.id}" value="${escapeHtml(displayedColor)}" title="この発言だけの色">
           ${entry.colorOverride !== null ? `<button class="revert-btn revert-entrycolor-btn" data-id="${entry.id}" title="この発言だけ色を元に戻す">↺</button>` : ""}`;
@@ -1783,7 +1845,7 @@ function generateExportHtml() {
         return `<div class="out-bubble-row out-speech-${part.kind} ${diceOutcome(e.text)}" data-characterid="${e.characterId}">
           ${avatar}
           <div class="out-bubble-content">
-            <p class="out-name" style="color:${escapeHtml(e.color)}">${part.kind === "pl" ? "PL" : escapeHtml(e.name)}</p>
+            <p class="out-name" style="color:${escapeHtml(e.color)}">${escapeHtml(e.name)}</p>
             <p class="out-bubble-text"${exportTextStyle(e)}>${escapeHtml(part.text)}</p>
           </div>
         </div>`;
@@ -1807,6 +1869,7 @@ function generateExportHtml() {
   const exportTabButtons = exportedTabs.map((tab, index) =>
     `<button type="button" class="out-tab-btn" data-tabid="${tab.id}" aria-pressed="${index === 0}">${escapeHtml(tab.name)}</button>`
   ).join("\n");
+  const exportedDiceTable = makeDiceTableHtml(getDicePersonRows());
   const viewpointOptionsHtml = currentMode === "serif"
     ? allCharacters.map((c) => `<option value="${c.id}" ${c.id === viewpointCharacterId ? "selected" : ""}>${escapeHtml(c.displayName)}</option>`).join("")
     : "";
@@ -1858,6 +1921,14 @@ body {
   max-width: 1100px;
   margin: 0 auto;
 }
+.out-dice-summary { display:none; }
+.out-dice-summary.active { display:block; }
+.dice-table-scroller { overflow-x:auto; max-width:100%; }
+.dice-comparison-table { border-collapse:collapse; width:100%; min-width:950px; font-size:14px; }
+.dice-comparison-table th,.dice-comparison-table td { border:1px solid var(--kp-border); padding:10px 12px; text-align:right; white-space:nowrap; }
+.dice-comparison-table thead th { background:var(--kp-bg); }
+.dice-comparison-table tbody tr:nth-child(even) { background:color-mix(in srgb,var(--kp-bg) 55%,transparent); }
+.dice-comparison-table th:first-child { text-align:left; }
 .out-toolbar {
   display: flex;
   gap: 10px;
@@ -1963,14 +2034,29 @@ body.out-hide-pc .out-speech-pc, body.out-hide-pl .out-speech-pl { display:none 
   ${viewpointBarHtml}
   ${currentMode === "serif" ? `<label><input type="checkbox" id="outShowPc" ${showPcSpeech ? "checked" : ""}> セリフ</label><label><input type="checkbox" id="outShowPl" ${showPlSpeech ? "checked" : ""}> PL発言</label>` : ""}
 </div>
+<nav class="out-tab-toolbar" aria-label="ログとダイス集計の切り替え"><button id="outShowLogs" type="button" aria-pressed="true">ログ</button><button id="outShowDice" type="button" aria-pressed="false">ダイス一覧表</button></nav>
+<div id="outLogView">
 <nav class="out-tab-toolbar" aria-label="ログタブ切り替え">
   <button id="outTabsMode" type="button" aria-pressed="true">タブ切り替え</button>
   <button id="outSplitMode" type="button" aria-pressed="false">横並び表示</button>
   <span id="outTabButtons">${exportTabButtons}</span>
 </nav>
 <main id="outPanels" class="out-panels tabs" style="--panel-count:${exportedTabs.length}">${bodyRows}</main>
+</div>
+<section id="outDiceView" class="out-dice-summary" aria-label="ダイス一覧表"><h2>ダイス一覧表</h2><div class="dice-table-scroller">${exportedDiceTable}</div><p>成功＝通常成功＋スペシャル＋クリティカル、失敗＝通常失敗＋ファンブル。各率の分母は人物ごとの解析済みダイス総数です。</p></section>
 
 <script>
+  var outLogView = document.getElementById("outLogView"), outDiceView = document.getElementById("outDiceView");
+  var outShowLogs = document.getElementById("outShowLogs"), outShowDice = document.getElementById("outShowDice");
+  function outShowPage(which) {
+    outLogView.hidden = which !== "logs";
+    outDiceView.classList.toggle("active",which === "dice");
+    outShowLogs.setAttribute("aria-pressed", String(which === "logs"));
+    outShowDice.setAttribute("aria-pressed", String(which === "dice"));
+  }
+  outShowLogs.addEventListener("click", function(){outShowPage("logs")});
+  outShowDice.addEventListener("click", function(){outShowPage("dice")});
+  outShowPage("logs");
   var outThemeBtn = document.getElementById("outThemeBtn");
   var isDark = false;
   var outAppearance = ${JSON.stringify(exportedAppearance)};
