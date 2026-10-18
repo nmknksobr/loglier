@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>loglier | ログリエ</title>
   <meta name="robots" content="noindex, nofollow">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
 
       <h1 class="app-title">
         <span class="app-title-icon">💬</span>
-        <span class="app-title-text">log<span class="app-title-accent">lier</span></span> <small class="app-version" aria-label="バージョン">v4</small>
+        <span class="app-title-text">log<span class="app-title-accent">lier</span></span> <small class="app-version" aria-label="バージョン">v6</small>
       </h1>
 
 
@@ -121,7 +121,8 @@
         <div id="diceSummaryList" class="dice-summary-list"></div>
       </section>
       <section id="diceTableWorkspace" class="dice-workspace" aria-label="ダイス一覧表" hidden>
-        <header class="dice-header"><h2>ダイス一覧表</h2><p>人物別のダイス回数と各割合を比較できます。通常成功・失敗の回数も含めて集計します。</p></header>
+        <header class="dice-header"><h2>ダイス一覧表</h2><button type="button" id="copyDiceTableBtn" class="copy-summary-btn">一覧表をコピー</button><p>人物別のダイス回数と各割合を比較できます。通常成功・失敗の回数も含めて集計します。</p></header>
+        <div id="diceTableCopyFallback" class="copy-fallback" hidden><p>コピーできない場合は、下の文字を選択してコピーしてください。</p><textarea id="diceTableCopyText" rows="6" readonly></textarea><button id="closeDiceTableCopyFallbackBtn" type="button">閉じる</button></div>
         <div class="dice-table-scroller" id="diceTableHost"></div>
         <p class="dice-analysis-note">成功＝通常成功＋スペシャル＋クリティカル、失敗＝通常失敗＋ファンブル。各率は人物の解析済みダイス総数を分母に計算します。判定不能のロールは総数のみに含みます。</p>
       </section>
@@ -130,6 +131,6 @@
 
   </div>
 
-  <script src="script.js?v=4"></script>
+  <script src="script.js?v=6"></script>
 </body>
 </html>

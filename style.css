@@ -1331,3 +1331,17 @@ body.dark-mode .appearance-palette-swatch {
 /* 人物ごとの表示切り替え */
 .character-visibility-control { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; font-size:.82em; color:var(--text-color); cursor:pointer; }
 .character-visibility-control input { accent-color: var(--accent-color, #56876c); width:16px; height:16px; }
+
+/* v6: 人物名は折り返さず全文表示。列は内容に応じて広がり、表全体を横スクロール。 */
+.dice-comparison-table { width:max-content; min-width:100%; }
+.dice-comparison-table th:first-child,
+.dice-comparison-table td:first-child {
+  width:1%; min-width:0; max-width:none;
+  white-space:nowrap; overflow-wrap:normal; word-break:normal;
+  font-size:12px;
+}
+@media (max-width:700px) {
+  .dice-comparison-table { font-size:12px; }
+  .dice-comparison-table th,.dice-comparison-table td { padding:8px 6px; }
+  .dice-comparison-table th:first-child,.dice-comparison-table td:first-child { font-size:11px; }
+}

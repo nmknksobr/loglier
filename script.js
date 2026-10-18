@@ -1021,6 +1021,37 @@ function makeDiceTableHtml(rows) {
   return `<table class="dice-comparison-table"><thead><tr>${cols.map(c=>`<th scope="col">${c}</th>`).join("")}</tr></thead><tbody>${cells || '<tr><td colspan="11">集計できるダイスロールがありません。</td></tr>'}</tbody></table>`;
 }
 function renderDiceTable() { document.getElementById("diceTableHost").innerHTML = makeDiceTableHtml(getDicePersonRows()); }
+// 表計算ソフトへ貼り付けられるタブ区切りの一覧表。画面と同じ集計データを使う。
+function formatDiceTableCopy() {
+  const columns = ["人物名","ダイス総数","成功","失敗","スペシャル","クリティカル","ファンブル","スペ率","クリ率","ファン率","成功率"];
+  const lines = [columns.join("\t")];
+  for (const r of getDicePersonRows()) {
+    const name = String(r.name).replace(/[\r\n\t]+/g, " ");
+    lines.push([name,r.total,r.successes,r.failures,r.special,r.critical,r.fumble,diceRate(r.special,r.total),diceRate(r.critical,r.total),diceRate(r.fumble,r.total),diceRate(r.successes,r.total)].join("\t"));
+  }
+  return lines.join("\n");
+}
+async function copyDiceTable() {
+  const value = formatDiceTableCopy();
+  try {
+    if (!navigator.clipboard?.writeText || !window.isSecureContext) throw new Error("Clipboard unavailable");
+    await navigator.clipboard.writeText(value);
+    const button = document.getElementById("copyDiceTableBtn");
+    button.textContent = "コピーしました";
+    setTimeout(() => { button.textContent = "一覧表をコピー"; }, 1500);
+  } catch {
+    const fallback = document.getElementById("diceTableCopyFallback");
+    const input = document.getElementById("diceTableCopyText");
+    fallback.hidden = false;
+    input.value = value;
+    input.focus(); input.select();
+  }
+}
+document.getElementById("copyDiceTableBtn").addEventListener("click", copyDiceTable);
+document.getElementById("closeDiceTableCopyFallbackBtn").addEventListener("click", () => {
+  document.getElementById("diceTableCopyFallback").hidden = true;
+});
+
 
 function countDiceRecords(records) {
   const counts = { total: records.length, critical: 0, special: 0, fumble: 0, success: 0, failure: 0, other: 0, initial: 0 };
@@ -1929,6 +1960,9 @@ body {
 .dice-comparison-table thead th { background:var(--kp-bg); }
 .dice-comparison-table tbody tr:nth-child(even) { background:color-mix(in srgb,var(--kp-bg) 55%,transparent); }
 .dice-comparison-table th:first-child { text-align:left; }
+.dice-comparison-table { width:max-content; min-width:100%; }
+.dice-comparison-table th:first-child,.dice-comparison-table td:first-child { width:1%; min-width:0; max-width:none; box-sizing:border-box; font-size:12px; white-space:nowrap; overflow-wrap:normal; word-break:normal; }
+@media (max-width:700px) { .dice-comparison-table { font-size:12px; } .dice-comparison-table th,.dice-comparison-table td { padding:8px 6px; } .dice-comparison-table th:first-child,.dice-comparison-table td:first-child { font-size:11px; } }
 .out-toolbar {
   display: flex;
   gap: 10px;
